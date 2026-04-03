@@ -28,7 +28,7 @@ Load firmware images, apply patches through a visual interface, and save the res
 | **Modify Top Speed** | Per-mode speed limit adjustment (available modes vary by firmware) |
 | **Bypass BLE Auth** | Skip Bluetooth authentication |
 | **Disable Battery Type Check** | Remove the controller's battery type validation |
-| **Disable Speed Haptic** | Disable haptic alerts for speed, torque, and error conditions |
+| **Disable Haptic** | Disable haptic alerts for speed and torque, motor error haptic is kept intact |
 | **Report Voltages** | Restore battery and cell voltage reporting over their original BLE characteristics |
 | **Spoof Generation** | Override the hardware revision reported to third party apps |
 | **Third Party Battery** | Remove third party battery pack restrictions and recalculate SoC to reflect actual battery percentage |

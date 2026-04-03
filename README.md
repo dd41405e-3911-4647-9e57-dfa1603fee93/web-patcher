@@ -4,6 +4,8 @@
 
 <p align="center">A web-based firmware patching tool for OneWheels, built in Rust and compiled to WebAssembly.</p>
 
+<p align="center"><a href="https://patcher.owtk.dev/">Try it out</a></p>
+
 ## Supported Boards
 
 | MCU Family | Boards |

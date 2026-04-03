@@ -268,6 +268,11 @@ impl eframe::App for PatcherApp {
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                ui.hyperlink_to(
+                    format!("v{} · Source Code", env!("CARGO_PKG_VERSION")),
+                    "https://github.com/dd41405e-3911-4647-9e57-dfa1603fee93/web-patcher",
+                );
+
                 egui::warn_if_debug_build(ui);
             });
         });

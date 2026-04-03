@@ -65,6 +65,7 @@ pub(crate) fn show(app: &mut PatcherApp, ctx: &egui::Context) {
                     if ui.selectable_label(app.show_supported_patches, "Supported Patches").clicked() {
                         app.show_supported_patches = !app.show_supported_patches;
                     }
+
                 }
             });
         });
@@ -122,6 +123,23 @@ pub(crate) fn show(app: &mut PatcherApp, ctx: &egui::Context) {
                         app.show_supported_patches = !app.show_supported_patches;
                         app.mobile_view =
                             if app.show_supported_patches { MobileView::SupportedPatches } else { MobileView::None };
+                        app.show_mobile_menu = false;
+                    }
+
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    if ui
+                        .add_sized(
+                            btn_size,
+                            egui::Button::new(
+                                egui::RichText::new(format!("{} GitHub", egui_phosphor::regular::GITHUB_LOGO)),
+                            ),
+                        )
+                        .clicked()
+                    {
+                        ctx.open_url(egui::OpenUrl::new_tab("https://github.com/dd41405e-3911-4647-9e57-dfa1603fee93/web-patcher"));
                         app.show_mobile_menu = false;
                     }
                 });

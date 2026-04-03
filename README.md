@@ -23,18 +23,22 @@ Load firmware images, apply patches through a visual interface, and save the res
 
 **Available firmware patches:**
 
-- **Modify Top Speed** - Per-mode speed limit adjustment (available modes vary by firmware)
-- **Bypass BLE Auth** - Skip Bluetooth authentication
-- **Disable Battery Type Check** - Remove the controller's battery type validation
-- **Disable Speed Haptic** - Disable haptic alerts for speed, torque, and error conditions
-- **Report Voltages** - Restore battery and cell voltage reporting over their original BLE characteristics
-- **Spoof Generation** - Override the hardware revision reported to third party apps
-- **Third Party Battery** - Remove third party battery pack restrictions and recalculate SoC to reflect actual battery percentage
-- **Unlock FWU** - Remove restrictions on entering firmware update mode
+| Patch | Description |
+|---|---|
+| **Modify Top Speed** | Per-mode speed limit adjustment (available modes vary by firmware) |
+| **Bypass BLE Auth** | Skip Bluetooth authentication |
+| **Disable Battery Type Check** | Remove the controller's battery type validation |
+| **Disable Speed Haptic** | Disable haptic alerts for speed, torque, and error conditions |
+| **Report Voltages** | Restore battery and cell voltage reporting over their original BLE characteristics |
+| **Spoof Generation** | Override the hardware revision reported to third party apps |
+| **Third Party Battery** | Remove third party battery pack restrictions and recalculate SoC to reflect actual battery percentage |
+| **Unlock FWU** | Remove restrictions on entering firmware update mode |
 
-### Bootloader Patching
+**Available bootloader patches:**
 
-- **Bypass Flashing Restrictions** - Skip the RSA signature check and firmware version comparison performed on OTA files
+| Patch | Description |
+|---|---|
+| **Bypass Flashing Restrictions** | Skip the RSA signature check and firmware version comparison performed on OTA files |
 
 ### Encryption & Decryption
 

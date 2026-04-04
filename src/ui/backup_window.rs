@@ -313,6 +313,13 @@ fn show_config_fields(ui: &mut egui::Ui, config: &mut BackupConfig, original: &B
     config_row_i16(ui, "Gyro X Offset:", &mut config.gyro_x_offset, original.gyro_x_offset);
     config_row_i16(ui, "Gyro Z Offset:", &mut config.gyro_z_offset, original.gyro_z_offset);
     config_row_i16(ui, "Gyro Y Offset:", &mut config.gyro_y_offset, original.gyro_y_offset);
+    config_row_enum::<HwGeneration>(ui, "Generation:", &mut config.generation, original.generation);
+    config_row_bool(ui, "Simplestop", &mut config.simplestop, original.simplestop);
+
+    if mcu == McuFamily::F4 {
+        config_row_bool(ui, "Haptic Enabled", &mut config.haptic_enabled, original.haptic_enabled);
+        config_row_bool(ui, "Recurve Rails", &mut config.recurve_rails, original.recurve_rails);
+    }
 
     config_row_u32(
         ui,
@@ -330,6 +337,79 @@ fn show_config_fields(ui: &mut egui::Ui, config: &mut BackupConfig, original: &B
         original.amp_hours_lo,
         original.amp_hours_hi,
     );
+}
+
+// ── ConfigEnum trait + implementations ───────────────────────────────
+
+/// A type that can be selected from a combo box and stored as `Option<u16>`.
+trait ConfigEnum: Copy + PartialEq + 'static {
+    fn from_u16(val: u16) -> Option<Self>;
+    fn to_u16(self) -> u16;
+    fn variants() -> &'static [Self];
+    fn label(self) -> &'static str;
+}
+
+/// Hardware generation values stored in the config.
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum HwGeneration {
+    V1,
+    V1_2,
+    Plus,
+    XR,
+    Pint,
+    GT,
+    PintXS,
+    GTS,
+    XRC,
+}
+
+impl ConfigEnum for HwGeneration {
+    fn from_u16(val: u16) -> Option<Self> {
+        match val {
+            1 => Some(Self::V1),
+            2 => Some(Self::V1_2),
+            3 => Some(Self::Plus),
+            4 => Some(Self::XR),
+            5 => Some(Self::Pint),
+            6 => Some(Self::GT),
+            7 => Some(Self::PintXS),
+            8 => Some(Self::GTS),
+            9 => Some(Self::XRC),
+            _ => None,
+        }
+    }
+
+    fn to_u16(self) -> u16 {
+        match self {
+            Self::V1 => 1,
+            Self::V1_2 => 2,
+            Self::Plus => 3,
+            Self::XR => 4,
+            Self::Pint => 5,
+            Self::GT => 6,
+            Self::PintXS => 7,
+            Self::GTS => 8,
+            Self::XRC => 9,
+        }
+    }
+
+    fn variants() -> &'static [Self] {
+        &[Self::V1, Self::V1_2, Self::Plus, Self::XR, Self::Pint, Self::GT, Self::PintXS, Self::GTS, Self::XRC]
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::V1 => "V1",
+            Self::V1_2 => "V1.2",
+            Self::Plus => "Plus",
+            Self::XR => "XR",
+            Self::Pint => "Pint",
+            Self::GT => "GT",
+            Self::PintXS => "Pint X/S",
+            Self::GTS => "GTS",
+            Self::XRC => "XRC",
+        }
+    }
 }
 
 // ── Row helpers (label left, value + reset right-aligned) ────────────
@@ -364,6 +444,44 @@ fn config_row_i16(ui: &mut egui::Ui, label: &str, val: &mut Option<u16>, origina
                 *val = original;
             }
             editable_i16(ui, val);
+        });
+    });
+}
+
+fn config_row_enum<T: ConfigEnum>(ui: &mut egui::Ui, label: &str, val: &mut Option<u16>, original: Option<u16>) {
+    let is_modified = *val != original;
+    ui.horizontal(|ui| {
+        modified_label(ui, label, is_modified);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if reset_button(ui, is_modified) {
+                *val = original;
+            }
+            let current = val.and_then(T::from_u16);
+            let display = current.map_or("Unknown", |v| v.label());
+            egui::ComboBox::from_id_salt(label).selected_text(display).show_ui(ui, |ui| {
+                for &variant in T::variants() {
+                    let selected = current == Some(variant);
+                    if ui.selectable_label(selected, variant.label()).clicked() {
+                        *val = Some(variant.to_u16());
+                    }
+                }
+            });
+        });
+    });
+}
+
+fn config_row_bool(ui: &mut egui::Ui, label: &str, val: &mut Option<u16>, original: Option<u16>) {
+    let is_modified = *val != original;
+    ui.horizontal(|ui| {
+        modified_label(ui, label, is_modified);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if reset_button(ui, is_modified) {
+                *val = original;
+            }
+            let mut checked = val.map_or(false, |v| v != 0);
+            if ui.checkbox(&mut checked, "").changed() {
+                *val = Some(if checked { 1 } else { 0 });
+            }
         });
     });
 }

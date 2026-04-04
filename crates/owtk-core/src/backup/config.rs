@@ -28,6 +28,12 @@ pub struct BackupConfig {
     pub gyro_x_offset: Option<u16>,
     pub gyro_z_offset: Option<u16>,
     pub gyro_y_offset: Option<u16>,
+    pub generation: Option<u16>,
+    pub simplestop: Option<u16>,
+
+    /// F4 Only
+    pub haptic_enabled: Option<u16>,
+    pub recurve_rails: Option<u16>,
 
     pub odometer_lo: Option<u16>,
     pub odometer_hi: Option<u16>,
@@ -108,7 +114,9 @@ const F1_SERIAL_LO: usize = 0x0A;
 const F1_ODOMETER: usize = 0x0C;
 const F1_AMP_HOURS: usize = 0x10;
 const F1_SERIAL_HI: usize = 0x30;
+const F1_GENERATION: usize = 0x28;
 const F1_BMS_ID: usize = 0x38;
+const F1_SIMPLESTOP: usize = 0x3C;
 
 /// Parses an F1 config page (1024 bytes) into a [`BackupConfig`].
 pub fn parse_f1_config(page: &[u8]) -> BackupConfig {
@@ -129,6 +137,10 @@ pub fn parse_f1_config(page: &[u8]) -> BackupConfig {
         gyro_x_offset: read_u16_le(page, F1_GYRO_X),
         gyro_z_offset: read_u16_le(page, F1_GYRO_Z),
         gyro_y_offset: read_u16_le(page, F1_GYRO_Y),
+        generation: read_u16_le(page, F1_GENERATION),
+        simplestop: read_u16_le(page, F1_SIMPLESTOP),
+        recurve_rails: None,
+        haptic_enabled: None,
         odometer_lo,
         odometer_hi,
         amp_hours_lo,
@@ -154,12 +166,16 @@ const F4_TAG_GYRO_Z: u16 = 0xA502;
 const F4_TAG_GYRO_Y: u16 = 0xA503;
 const F4_TAG_SERIAL_LO: u16 = 0xA504;
 const F4_TAG_SERIAL_HI: u16 = 0xA505;
+const F4_TAG_GENERATION: u16 = 0xA506;
 const F4_TAG_ODOMETER_LO: u16 = 0xA50C;
 const F4_TAG_ODOMETER_HI: u16 = 0xA50D;
 const F4_TAG_AMP_HOURS_LO: u16 = 0xA50E;
 const F4_TAG_AMP_HOURS_HI: u16 = 0xA50F;
+const F4_TAG_SIMPLESTOP: u16 = 0xA514;
 const F4_TAG_BMS_SERIAL_LO: u16 = 0xA51E;
 const F4_TAG_BMS_SERIAL_HI: u16 = 0xA51F;
+const F4_TAG_HAPTIC_ENABLED: u16 = 0xA52E;
+const F4_TAG_RECURVE_RAILS: u16 = 0xA535;
 
 /// Parses a single F4 config sector by scanning its append-only log.
 ///
@@ -194,10 +210,14 @@ fn parse_f4_sector(sector: &[u8]) -> Option<BackupConfig> {
             F4_TAG_SERIAL_HI => config.serial_hi = Some(value),
             F4_TAG_ODOMETER_LO => config.odometer_lo = Some(value),
             F4_TAG_ODOMETER_HI => config.odometer_hi = Some(value),
+            F4_TAG_GENERATION => config.generation = Some(value),
             F4_TAG_AMP_HOURS_LO => config.amp_hours_lo = Some(value),
             F4_TAG_AMP_HOURS_HI => config.amp_hours_hi = Some(value),
+            F4_TAG_SIMPLESTOP => config.simplestop = Some(value),
             F4_TAG_BMS_SERIAL_LO => config.bms_serial_lo = Some(value),
             F4_TAG_BMS_SERIAL_HI => config.bms_serial_hi = Some(value),
+            F4_TAG_HAPTIC_ENABLED => config.haptic_enabled = Some(value),
+            F4_TAG_RECURVE_RAILS => config.haptic_enabled = Some(value),
             _ => {} // ignore all other tags
         }
 
@@ -223,35 +243,28 @@ pub fn read_f4_otp_serial(data: &[u8]) -> (Option<u16>, Option<u16>) {
 
 /// Writes the essential config values back into the raw F1 backup data.
 ///
-/// Both config pages are erased first so that any fields we don't
-/// track are default-initialized (`0xFF`).
+/// Only the primary config page is written; the backup page is wiped
+/// to 0xFF. Writing both pages can cause crashes on some boards.
 pub fn write_f1_config(data: &mut [u8], config: &BackupConfig) {
     let p = F1_CONFIG_PRIMARY_START;
-    let b = F1_CONFIG_BACKUP_START;
 
-    // Erase both config pages so untracked fields revert to defaults.
-    data.get_mut(b..p).expect("backup too small for F1 config backup page").fill(0xFF);
+    // Wipe the backup page and erase the primary page before writing.
+    data.get_mut(F1_CONFIG_BACKUP_START..p).expect("backup too small for F1 config backup page").fill(0xFF);
     data.get_mut(p..F1_CONFIG_PRIMARY_END).expect("backup too small for F1 config primary page").fill(0xFF);
 
-    // Serial: backed up (both pages).
-    let backed_up = |data: &mut [u8], offset: usize, val: Option<u16>| {
-        write_u16_le(data, p + offset, val);
-        write_u16_le(data, b + offset, val);
-    };
+    // All fields written to primary page only.
+    write_u16_le(data, p + F1_TILT_PITCH, config.tilt_pitch);
+    write_u16_le(data, p + F1_GYRO_X, config.gyro_x_offset);
+    write_u16_le(data, p + F1_GYRO_Z, config.gyro_z_offset);
+    write_u16_le(data, p + F1_GYRO_Y, config.gyro_y_offset);
+    write_u16_le(data, p + F1_GENERATION, config.generation);
+    write_u16_le(data, p + F1_SIMPLESTOP, config.simplestop.or(Some(0)));
+    write_u16_le(data, p + F1_SERIAL_LO, config.serial_lo);
+    write_u16_le(data, p + F1_SERIAL_HI, config.serial_hi);
 
-    backed_up(data, F1_TILT_PITCH, config.tilt_pitch);
-    backed_up(data, F1_GYRO_X, config.gyro_x_offset);
-    backed_up(data, F1_GYRO_Z, config.gyro_z_offset);
-    backed_up(data, F1_GYRO_Y, config.gyro_y_offset);
-    backed_up(data, F1_SERIAL_LO, config.serial_lo);
-    backed_up(data, F1_SERIAL_HI, config.serial_hi);
-
-    // BMS ID: backed up as a u32.
     let bms = combine_u16s(config.bms_serial_lo, config.bms_serial_hi);
     write_u32_le(data, p + F1_BMS_ID, bms);
-    write_u32_le(data, b + F1_BMS_ID, bms);
 
-    // Odometer and amp hours (primary page only, stored as u32).
     let odo = combine_u16s(config.odometer_lo, config.odometer_hi);
     write_u32_le(data, p + F1_ODOMETER, odo);
 
@@ -281,10 +294,14 @@ pub fn write_f4_config(data: &mut [u8], config: &BackupConfig) {
         (F4_TAG_SERIAL_HI, config.serial_hi),
         (F4_TAG_ODOMETER_LO, config.odometer_lo),
         (F4_TAG_ODOMETER_HI, config.odometer_hi),
+        (F4_TAG_GENERATION, config.generation),
         (F4_TAG_AMP_HOURS_LO, config.amp_hours_lo),
         (F4_TAG_AMP_HOURS_HI, config.amp_hours_hi),
         (F4_TAG_BMS_SERIAL_LO, config.bms_serial_lo),
         (F4_TAG_BMS_SERIAL_HI, config.bms_serial_hi),
+        (F4_TAG_SIMPLESTOP, config.simplestop.or(Some(0))),
+        (F4_TAG_HAPTIC_ENABLED, config.haptic_enabled),
+        (F4_TAG_RECURVE_RAILS, config.recurve_rails),
     ];
 
     let mut offset = F4_HEADER_SIZE;
@@ -379,10 +396,9 @@ mod tests {
         // Tilt pitch should be preserved.
         assert_eq!(reparsed.tilt_pitch, Some(42));
 
-        // Backup page should also have the serial written.
+        // Backup page should be wiped (all 0xFF).
         let backup = &data[F1_CONFIG_BACKUP_START..F1_CONFIG_BACKUP_START + 1024];
-        assert_eq!(read_u16_le(backup, F1_SERIAL_LO), Some(9999));
-        assert_eq!(read_u16_le(backup, F1_SERIAL_HI), Some(1111));
+        assert!(backup.iter().all(|&b| b == 0xFF));
     }
 
     // ── F4 ───────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::helpers::{card_frame, small_button_width, truncate_to_fit};
+use super::helpers::card_frame;
 use crate::app::{PatcherApp, PendingFileKind};
 use owtk_core::crypto::CryptoIdentifier;
 use owtk_core::firmware::known_firmwares;
@@ -88,18 +88,14 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                         ui.add_space(4.0);
                     }
 
-                    let hash = key.display_hash();
+                    let label = compatible_firmwares(&key.identifier).keys().cloned().collect::<Vec<_>>().join(", ");
 
                     card_frame(ui).show(ui, |ui| {
                         let id = ui.make_persistent_id(format!("crypto_key_{i}"));
                         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
                             .show_header(ui, |ui| {
-                                let avail =
-                                    ui.available_width() - small_button_width(ui, egui_phosphor::regular::TRASH) - 8.0;
-
-                                let header_text = truncate_to_fit(ui, "sha1: ", &hash, avail, 4);
-
-                                ui.monospace(&header_text).on_hover_text(&hash);
+                                ui.strong(&label);
+                                ui.label(egui::RichText::new(format!("({})", key.identifier.method)).weak());
 
                                 // Right-aligned remove button
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -116,10 +112,6 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                                 egui::Grid::new(format!("key_details_{i}")).num_columns(2).spacing([8.0, 4.0]).show(
                                     ui,
                                     |ui| {
-                                        ui.label("Method:");
-                                        ui.monospace(key.identifier.method.to_string());
-                                        ui.end_row();
-
                                         ui.label("Key:");
                                         ui.monospace(hex::encode(key.key));
                                         ui.end_row();
@@ -132,23 +124,20 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                                     },
                                 );
 
-                                ui.add_space(6.0);
+                                let compat = compatible_firmwares(&key.identifier);
+                                if !compat.is_empty() {
+                                    ui.add_space(6.0);
 
-                                let compat_id = ui.make_persistent_id(format!("compat_fw_{i}"));
-                                egui::collapsing_header::CollapsingState::load_with_default_open(
-                                    ui.ctx(),
-                                    compat_id,
-                                    false,
-                                )
-                                .show_header(ui, |ui| {
-                                    ui.strong("Compatible Firmware");
-                                })
-                                .body(|ui| {
-                                    let compat = compatible_firmwares(&key.identifier);
-
-                                    if compat.is_empty() {
-                                        ui.label("No known firmware in the database uses this key.");
-                                    } else {
+                                    let compat_id = ui.make_persistent_id(format!("compat_fw_{i}"));
+                                    egui::collapsing_header::CollapsingState::load_with_default_open(
+                                        ui.ctx(),
+                                        compat_id,
+                                        false,
+                                    )
+                                    .show_header(ui, |ui| {
+                                        ui.strong("Compatible Firmware");
+                                    })
+                                    .body(|ui| {
                                         egui::Grid::new(format!("compat_grid_{i}"))
                                             .num_columns(2)
                                             .spacing([12.0, 3.0])
@@ -164,8 +153,8 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                                                     ui.end_row();
                                                 }
                                             });
-                                    }
-                                });
+                                    });
+                                }
                             });
                     });
                 }

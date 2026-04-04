@@ -348,8 +348,12 @@ mod tests {
         page[0x0A..0x0C].copy_from_slice(&1234_u16.to_le_bytes());
         // odometer at offset 0x0C (u32 LE)
         page[0x0C..0x10].copy_from_slice(&50000_u32.to_le_bytes());
+        // generation at offset 0x28
+        page[0x28..0x2A].copy_from_slice(&3_u16.to_le_bytes());
         // serial_hi at offset 0x30
         page[0x30..0x32].copy_from_slice(&5678_u16.to_le_bytes());
+        // simplestop at offset 0x3C
+        page[0x3C..0x3E].copy_from_slice(&1_u16.to_le_bytes());
         page
     }
 
@@ -362,6 +366,10 @@ mod tests {
         assert_eq!(config.serial_hi, Some(5678));
         assert_eq!(config.odometer_lo, Some(50000_u32 as u16));
         assert_eq!(config.odometer_hi, Some((50000_u32 >> 16) as u16));
+        assert_eq!(config.generation, Some(3));
+        assert_eq!(config.simplestop, Some(1));
+        assert_eq!(config.haptic_enabled, None);
+        assert_eq!(config.recurve_rails, None);
     }
 
     #[test]
@@ -371,6 +379,8 @@ mod tests {
         assert_eq!(config.serial_lo, None);
         assert_eq!(config.odometer_lo, None);
         assert_eq!(config.tilt_pitch, None);
+        assert_eq!(config.generation, None);
+        assert_eq!(config.simplestop, None);
     }
 
     #[test]
@@ -395,6 +405,9 @@ mod tests {
         assert_eq!(reparsed.serial_hi, Some(1111));
         // Tilt pitch should be preserved.
         assert_eq!(reparsed.tilt_pitch, Some(42));
+        // New fields should be preserved.
+        assert_eq!(reparsed.generation, Some(3));
+        assert_eq!(reparsed.simplestop, Some(1));
 
         // Backup page should be wiped (all 0xFF).
         let backup = &data[F1_CONFIG_BACKUP_START..F1_CONFIG_BACKUP_START + 1024];
@@ -420,6 +433,26 @@ mod tests {
         // Record: serial_hi = 5678, tag = 0xA505
         sector[offset..offset + 2].copy_from_slice(&5678_u16.to_le_bytes());
         sector[offset + 2..offset + 4].copy_from_slice(&F4_TAG_SERIAL_HI.to_le_bytes());
+        offset += 4;
+
+        // Record: generation = 3, tag = 0xA506
+        sector[offset..offset + 2].copy_from_slice(&3_u16.to_le_bytes());
+        sector[offset + 2..offset + 4].copy_from_slice(&F4_TAG_GENERATION.to_le_bytes());
+        offset += 4;
+
+        // Record: simplestop = 1, tag = 0xA514
+        sector[offset..offset + 2].copy_from_slice(&1_u16.to_le_bytes());
+        sector[offset + 2..offset + 4].copy_from_slice(&F4_TAG_SIMPLESTOP.to_le_bytes());
+        offset += 4;
+
+        // Record: haptic_enabled = 1, tag = 0xA52E
+        sector[offset..offset + 2].copy_from_slice(&1_u16.to_le_bytes());
+        sector[offset + 2..offset + 4].copy_from_slice(&F4_TAG_HAPTIC_ENABLED.to_le_bytes());
+        offset += 4;
+
+        // Record: recurve_rails = 1, tag = 0xA535
+        sector[offset..offset + 2].copy_from_slice(&1_u16.to_le_bytes());
+        sector[offset + 2..offset + 4].copy_from_slice(&F4_TAG_RECURVE_RAILS.to_le_bytes());
 
         sector
     }
@@ -430,6 +463,10 @@ mod tests {
         let config = parse_f4_sector(&sector).expect("active sector");
         assert_eq!(config.serial_lo, Some(1234));
         assert_eq!(config.serial_hi, Some(5678));
+        assert_eq!(config.generation, Some(3));
+        assert_eq!(config.simplestop, Some(1));
+        assert_eq!(config.haptic_enabled, Some(1));
+        assert_eq!(config.recurve_rails, Some(1));
         // Fields not in the sector should be None.
         assert_eq!(config.tilt_pitch, None);
     }
@@ -467,6 +504,11 @@ mod tests {
         let reparsed = parse_f4_sector(reparsed_sector).expect("written sector should be active");
         assert_eq!(reparsed.serial_lo, Some(9999));
         assert_eq!(reparsed.serial_hi, Some(5678)); // preserved
+        // New fields should be preserved.
+        assert_eq!(reparsed.generation, Some(3));
+        assert_eq!(reparsed.simplestop, Some(1));
+        assert_eq!(reparsed.haptic_enabled, Some(1));
+        assert_eq!(reparsed.recurve_rails, Some(1));
 
         // Sector B should be erased.
         assert!(data[F4_CONFIG_B_START..F4_CONFIG_B_END].iter().all(|&b| b == 0xFF));

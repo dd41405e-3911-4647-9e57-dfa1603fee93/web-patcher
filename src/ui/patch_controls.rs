@@ -83,6 +83,7 @@ fn status_label(entry: &PatchEntry) -> &str {
         PatchStatus::Stock => "Stock",
         PatchStatus::Applied => "Applied",
         PatchStatus::Unknown => "Unknown state",
+        PatchStatus::Blind => "Blind",
     }
 }
 
@@ -92,6 +93,7 @@ fn status_color(entry: &PatchEntry) -> egui::Color32 {
         PatchStatus::Stock => egui::Color32::from_rgb(120, 180, 120),
         PatchStatus::Applied => egui::Color32::from_rgb(100, 160, 220),
         PatchStatus::Unknown => egui::Color32::YELLOW,
+        PatchStatus::Blind => egui::Color32::from_rgb(180, 140, 200),
     }
 }
 
@@ -106,6 +108,9 @@ fn status_tooltip(entry: &PatchEntry) -> &str {
         }
         PatchStatus::Unknown => {
             "The patch's target offsets extend past the loaded firmware buffer — status could not be determined."
+        }
+        PatchStatus::Blind => {
+            "This patch has no known original bytes — its applied state cannot be detected."
         }
     }
 }
@@ -239,12 +244,10 @@ fn show_enum_input(ui: &mut egui::Ui, id_salt: &str, options: &[(String, String)
 
 /// Renders a hex byte string text input, updating `value` when the input is valid.
 fn show_hex_input(ui: &mut egui::Ui, id: egui::Id, len: usize, value: &mut ScriptValue) {
-    let mut buf = ui
-        .data_mut(|d| d.get_temp::<String>(id))
-        .unwrap_or_else(|| match value {
-            ScriptValue::Bytes(b) => hex::encode(b),
-            _ => "00".repeat(len),
-        });
+    let mut buf = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_else(|| match value {
+        ScriptValue::Bytes(b) => hex::encode(b),
+        _ => "00".repeat(len),
+    });
 
     let expected_chars = len * 2;
     let is_valid = buf.len() == expected_chars && buf.chars().all(|c| c.is_ascii_hexdigit());

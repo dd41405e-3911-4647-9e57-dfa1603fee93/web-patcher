@@ -61,17 +61,23 @@ fn patch_err(id: &str, err: impl std::fmt::Display) -> PatchError {
 /// - All targets match `original` → [`PatchStatus::Stock`]
 /// - All targets are readable but at least one differs → [`PatchStatus::Applied`]
 /// - Any target extends past the firmware buffer → [`PatchStatus::Unknown`]
+/// - All targets are blind/append (none checkable) → [`PatchStatus::Blind`]
 pub fn detect_status(firmware: &[u8], definition: &PatchDefinition) -> PatchStatus {
     let mut all_stock = true;
+    let mut any_checked = false;
     for target in &definition.targets {
         if target.append || target.blind {
             continue;
         }
+        any_checked = true;
         match read_bytes(firmware, target.offset, target.original.len()) {
             Some(current) if current == target.original.as_slice() => {}
             Some(_) => all_stock = false,
             None => return PatchStatus::Unknown,
         }
+    }
+    if !any_checked {
+        return PatchStatus::Blind;
     }
     if all_stock { PatchStatus::Stock } else { PatchStatus::Applied }
 }

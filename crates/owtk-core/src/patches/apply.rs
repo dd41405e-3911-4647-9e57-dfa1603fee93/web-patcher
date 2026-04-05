@@ -64,7 +64,7 @@ fn patch_err(id: &str, err: impl std::fmt::Display) -> PatchError {
 pub fn detect_status(firmware: &[u8], definition: &PatchDefinition) -> PatchStatus {
     let mut all_stock = true;
     for target in &definition.targets {
-        if target.append {
+        if target.append || target.blind {
             continue;
         }
         match read_bytes(firmware, target.offset, target.original.len()) {
@@ -397,7 +397,7 @@ fn resolve_targets(
                 let &offset = allocs
                     .get(&(patch_id.to_owned(), i))
                     .ok_or_else(|| anyhow::anyhow!("missing append allocation for patch '{patch_id}' target {i}"))?;
-                Ok(ScriptTarget { offset, original: t.original.clone(), meta: t.meta.clone(), append: true })
+                Ok(ScriptTarget { offset, original: t.original.clone(), meta: t.meta.clone(), append: true, blind: t.blind })
             } else {
                 Ok(t.clone())
             }
@@ -419,9 +419,9 @@ fn apply_single_patch(
 
     match &entry.selection {
         PatchSelection::Disabled => {
-            // Revert to stock — only fixed targets.
+            // Revert to stock — only fixed targets with known original bytes.
             for target in &def.targets {
-                if target.append {
+                if target.append || target.blind {
                     continue;
                 }
                 let old = read_bytes(firmware, target.offset, target.original.len()).unwrap_or(&[]).to_vec();
@@ -542,11 +542,11 @@ mod tests {
     }
 
     fn fixed_target(offset: usize, original: &[u8]) -> ScriptTarget {
-        ScriptTarget { offset, original: original.to_vec(), meta: None, append: false }
+        ScriptTarget { offset, original: original.to_vec(), meta: None, append: false, blind: false }
     }
 
     fn append_target(size: usize) -> ScriptTarget {
-        ScriptTarget { offset: 0, original: vec![0u8; size], meta: None, append: true }
+        ScriptTarget { offset: 0, original: vec![0u8; size], meta: None, append: true, blind: false }
     }
 
     // ── detect_status ────────────────────────────────────────────

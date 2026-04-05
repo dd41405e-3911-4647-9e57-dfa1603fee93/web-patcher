@@ -576,11 +576,18 @@ fn parse_targets_array(entry: &Map) -> anyhow::Result<Vec<ScriptTarget>> {
     let mut targets = Vec::with_capacity(targets_arr.len());
     for target_map in &targets_arr {
         let append = target_map.get("append").and_then(|v| v.as_bool().ok()).unwrap_or(false);
+        let blind = target_map.get("blind").and_then(|v| v.as_bool().ok()).unwrap_or(false);
 
         let (offset, original) = if append {
             let size =
                 target_map.get("size").and_then(|v| v.as_int().ok()).context("append target missing 'size'")? as usize;
             (0, vec![0u8; size])
+        } else if blind {
+            let offset =
+                target_map.get("offset").and_then(|v| v.as_int().ok()).context("target missing 'offset'")? as usize;
+            let size =
+                target_map.get("size").and_then(|v| v.as_int().ok()).context("blind target missing 'size'")? as usize;
+            (offset, vec![0u8; size])
         } else {
             let offset =
                 target_map.get("offset").and_then(|v| v.as_int().ok()).context("target missing 'offset'")? as usize;
@@ -601,7 +608,7 @@ fn parse_targets_array(entry: &Map) -> anyhow::Result<Vec<ScriptTarget>> {
 
         let meta = target_map.get("meta").and_then(|v| v.clone().try_cast::<Map>());
 
-        targets.push(ScriptTarget { offset, original, meta, append });
+        targets.push(ScriptTarget { offset, original, meta, append, blind });
     }
     Ok(targets)
 }
@@ -618,6 +625,7 @@ fn build_targets_array(targets: &[ScriptTarget]) -> Array {
             map.insert("original".into(), Dynamic::from(t.original.clone()));
             map.insert("len".into(), Dynamic::from(t.original.len() as i64));
             map.insert("append".into(), Dynamic::from(t.append));
+            map.insert("blind".into(), Dynamic::from(t.blind));
             if let Some(meta) = &t.meta {
                 map.insert("meta".into(), Dynamic::from(meta.clone()));
             }
@@ -685,6 +693,19 @@ fn parse_script_param(map: &Map) -> anyhow::Result<ScriptParam> {
                 .unwrap_or_else(|| options.first().map_or_else(String::new, |o| o.0.clone()));
             (ScriptParamKind::Enum { options }, ScriptValue::String(def))
         }
+        "hex" => {
+            let len =
+                map.get("len").and_then(|v| v.as_int().ok()).context("hex parameter missing 'len'")? as usize;
+            let def = match map.get("initial") {
+                Some(v) if v.is_blob() => v.clone().cast::<Vec<u8>>(),
+                Some(v) => {
+                    let s = v.clone().into_string().unwrap_or_default();
+                    parse_hex_bytes(&s).unwrap_or_else(|_| vec![0u8; len])
+                }
+                None => vec![0u8; len],
+            };
+            (ScriptParamKind::Hex { len }, ScriptValue::Bytes(def))
+        }
         other => bail!("unknown parameter kind '{other}'"),
     };
 
@@ -707,6 +728,7 @@ fn build_params_map(params: &[ScriptParam], values: &[ScriptValue]) -> Map {
             ScriptValue::Int(i) => Dynamic::from(*i),
             ScriptValue::Float(f) => Dynamic::from(*f),
             ScriptValue::String(s) => Dynamic::from(s.clone()),
+            ScriptValue::Bytes(b) => Dynamic::from(b.clone()),
         };
         map.insert(param.name.clone().into(), dynamic);
     }
@@ -803,6 +825,16 @@ fn dynamic_to_script_value(d: &Dynamic, kind: &ScriptParamKind) -> ScriptValue {
         ScriptParamKind::Integer { .. } => ScriptValue::Int(d.as_int().unwrap_or(0)),
         ScriptParamKind::Float { .. } => ScriptValue::Float(d.as_float().unwrap_or(0.0)),
         ScriptParamKind::Enum { .. } => ScriptValue::String(d.clone().into_string().unwrap_or_default()),
+        ScriptParamKind::Hex { len } => {
+            // read() may return a blob or a hex string.
+            if d.is_blob() {
+                ScriptValue::Bytes(d.clone().cast::<Vec<u8>>())
+            } else if let Ok(s) = d.clone().into_string() {
+                ScriptValue::Bytes(parse_hex_bytes(&s).unwrap_or_else(|_| vec![0u8; *len]))
+            } else {
+                ScriptValue::Bytes(vec![0u8; *len])
+            }
+        }
     }
 }
 
@@ -953,7 +985,7 @@ mod tests {
                     // Build a fake firmware map with original bytes at each offset.
                     let mut fw_map = Map::new();
                     for target in &ve.targets {
-                        if target.append {
+                        if target.append || target.blind {
                             continue;
                         }
                         fw_map.insert(target.offset.to_string().into(), Dynamic::from(target.original.clone()));

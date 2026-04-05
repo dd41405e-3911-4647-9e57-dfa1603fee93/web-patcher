@@ -21,6 +21,12 @@ pub struct ScriptTarget {
     /// `offset` field is assigned by the allocator before `apply()` runs;
     /// `original` is empty.
     pub append: bool,
+    /// When `true`, the original bytes at this offset are unknown (e.g.
+    /// encryption keys that cannot be distributed for licensing reasons).
+    /// The target uses `size` instead of `original` — `original` is a
+    /// zero-filled placeholder whose only purpose is carrying the byte
+    /// length.  Detection and revert both skip blind targets.
+    pub blind: bool,
 }
 
 /// A parameter declared by a script's `parameters()` function for UI
@@ -52,6 +58,9 @@ pub enum ScriptParamKind {
     /// A selection from named options (combo box).
     /// Each tuple is `(value_name, display_label)`.
     Enum { options: Vec<(String, String)> },
+    /// A fixed-length hex byte string input (e.g. for encryption keys).
+    /// `len` is the expected number of **bytes** (not hex characters).
+    Hex { len: usize },
 }
 
 /// A dynamically-typed value for script parameters.
@@ -61,6 +70,8 @@ pub enum ScriptValue {
     Int(i64),
     Float(f64),
     String(String),
+    /// Raw byte vector, typically entered as a hex string in the UI.
+    Bytes(Vec<u8>),
 }
 
 // ── Patch definition ────────────────────────────────────────────────────

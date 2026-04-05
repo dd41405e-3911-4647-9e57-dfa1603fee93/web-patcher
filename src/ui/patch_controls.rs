@@ -167,49 +167,108 @@ fn show_script_params(
                 }
                 ScriptParamKind::Integer { min, max } => {
                     add_label(ui);
-                    let mut v = match value {
-                        ScriptValue::Int(i) => *i,
-                        _ => *min,
-                    };
-                    if ui.add(egui::DragValue::new(&mut v).range(*min..=*max).speed(1.0)).changed() {
-                        *value = ScriptValue::Int(v);
-                    }
+                    show_integer_input(ui, *min, *max, value);
                     add_revert(ui, value, initial);
                     ui.end_row();
                 }
                 ScriptParamKind::Float { min, max } => {
                     add_label(ui);
-                    let mut v = match value {
-                        ScriptValue::Float(f) => *f,
-                        _ => *min,
-                    };
-                    if ui.add(egui::DragValue::new(&mut v).range(*min..=*max).speed(0.1).max_decimals(4)).changed() {
-                        *value = ScriptValue::Float(v);
-                    }
+                    show_float_input(ui, *min, *max, value);
                     add_revert(ui, value, initial);
                     ui.end_row();
                 }
                 ScriptParamKind::Enum { options } => {
                     add_label(ui);
-                    let current_label = match value {
-                        ScriptValue::String(s) => {
-                            options.iter().find(|(v, _)| v == s).map_or(s.as_str(), |(_, label)| label.as_str())
-                        }
-                        _ => "(none)",
-                    };
-
                     let id_salt = format!("script_param_{cache_key}_{}", param.name);
-                    egui::ComboBox::from_id_salt(id_salt).selected_text(current_label).show_ui(ui, |ui| {
-                        for (opt_value, opt_label) in options {
-                            let is_selected = matches!(value, ScriptValue::String(s) if s == opt_value);
-                            if ui.selectable_label(is_selected, opt_label).clicked() && !is_selected {
-                                *value = ScriptValue::String(opt_value.clone());
-                            }
-                        }
-                    });
+                    show_enum_input(ui, &id_salt, options, value);
+                    ui.end_row();
+                }
+                ScriptParamKind::Hex { len } => {
+                    add_label(ui);
+                    let id = egui::Id::new(format!("hex_buf_{cache_key}_{}", param.name));
+                    show_hex_input(ui, id, *len, value);
+                    let before = value.clone();
+                    add_revert(ui, value, initial);
+                    if *value != before {
+                        ui.data_mut(|d| d.remove::<String>(id));
+                    }
                     ui.end_row();
                 }
             }
         }
     });
+}
+
+/// Renders an integer drag-value control.
+fn show_integer_input(ui: &mut egui::Ui, min: i64, max: i64, value: &mut ScriptValue) {
+    let mut v = match value {
+        ScriptValue::Int(i) => *i,
+        _ => min,
+    };
+    if ui.add(egui::DragValue::new(&mut v).range(min..=max).speed(1.0)).changed() {
+        *value = ScriptValue::Int(v);
+    }
+}
+
+/// Renders a float drag-value control.
+fn show_float_input(ui: &mut egui::Ui, min: f64, max: f64, value: &mut ScriptValue) {
+    let mut v = match value {
+        ScriptValue::Float(f) => *f,
+        _ => min,
+    };
+    if ui.add(egui::DragValue::new(&mut v).range(min..=max).speed(0.1).max_decimals(4)).changed() {
+        *value = ScriptValue::Float(v);
+    }
+}
+
+/// Renders an enum combo-box control.
+fn show_enum_input(ui: &mut egui::Ui, id_salt: &str, options: &[(String, String)], value: &mut ScriptValue) {
+    let current_label = match value {
+        ScriptValue::String(s) => options.iter().find(|(v, _)| v == s).map_or(s.as_str(), |(_, label)| label.as_str()),
+        _ => "(none)",
+    };
+    egui::ComboBox::from_id_salt(id_salt).selected_text(current_label).show_ui(ui, |ui| {
+        for (opt_value, opt_label) in options {
+            let is_selected = matches!(value, ScriptValue::String(s) if s == opt_value);
+            if ui.selectable_label(is_selected, opt_label).clicked() && !is_selected {
+                *value = ScriptValue::String(opt_value.clone());
+            }
+        }
+    });
+}
+
+/// Renders a hex byte string text input, updating `value` when the input is valid.
+fn show_hex_input(ui: &mut egui::Ui, id: egui::Id, len: usize, value: &mut ScriptValue) {
+    let mut buf = ui
+        .data_mut(|d| d.get_temp::<String>(id))
+        .unwrap_or_else(|| match value {
+            ScriptValue::Bytes(b) => hex::encode(b),
+            _ => "00".repeat(len),
+        });
+
+    let expected_chars = len * 2;
+    let is_valid = buf.len() == expected_chars && buf.chars().all(|c| c.is_ascii_hexdigit());
+
+    let text_color = if is_valid { ui.visuals().text_color() } else { egui::Color32::from_rgb(255, 100, 100) };
+
+    let response = ui.add(
+        egui::TextEdit::singleline(&mut buf)
+            .font(egui::TextStyle::Monospace)
+            .desired_width((len as f32 * 16.0).min(400.0))
+            .char_limit(expected_chars)
+            .text_color(text_color)
+            .hint_text(format!("{expected_chars} hex chars")),
+    );
+
+    if response.changed() {
+        buf = buf.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_lowercase();
+    }
+
+    if buf.len() == expected_chars && buf.chars().all(|c| c.is_ascii_hexdigit()) {
+        if let Ok(bytes) = hex::decode(&buf) {
+            *value = ScriptValue::Bytes(bytes);
+        }
+    }
+
+    ui.data_mut(|d| d.insert_temp(id, buf));
 }

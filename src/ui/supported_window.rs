@@ -270,5 +270,6 @@ fn param_kind_hint(kind: &ScriptParamKind) -> String {
         ScriptParamKind::Integer { min, max } => format!("int({min}..{max})"),
         ScriptParamKind::Float { min, max } => format!("float({min}..{max})"),
         ScriptParamKind::Enum { options } => format!("{} options", options.len()),
+        ScriptParamKind::Hex { len } => format!("hex({len} bytes)"),
     }
 }

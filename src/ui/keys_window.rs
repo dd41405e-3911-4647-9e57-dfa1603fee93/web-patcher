@@ -2,18 +2,19 @@ use std::collections::BTreeMap;
 
 use super::helpers::card_frame;
 use crate::app::{PatcherApp, PendingFileKind};
+use owtk_core::board::BoardGeneration;
 use owtk_core::crypto::CryptoIdentifier;
 use owtk_core::firmware::known_firmwares;
 
 /// For a given `CryptoIdentifier`, collects all compatible firmware descriptors
 /// from the known firmware database, grouped by board generation and sorted by
 /// version number.
-fn compatible_firmwares(ident: &CryptoIdentifier) -> BTreeMap<String, Vec<u16>> {
-    let mut map: BTreeMap<String, Vec<u16>> = BTreeMap::new();
+fn compatible_firmwares(ident: &CryptoIdentifier) -> BTreeMap<BoardGeneration, Vec<u16>> {
+    let mut map: BTreeMap<BoardGeneration, Vec<u16>> = BTreeMap::new();
 
     for fw in known_firmwares() {
         if fw.crypto_identifier == *ident {
-            map.entry(fw.board.to_string()).or_default().push(fw.version);
+            map.entry(fw.board).or_default().push(fw.version);
         }
     }
 
@@ -90,7 +91,11 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                         ui.add_space(4.0);
                     }
 
-                    let label = compatible_firmwares(&key.identifier).keys().cloned().collect::<Vec<_>>().join(", ");
+                    let label = compatible_firmwares(&key.identifier)
+                        .keys()
+                        .map(|b| b.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
 
                     card_frame(ui).show(ui, |ui| {
                         let id = ui.make_persistent_id(format!("crypto_key_{i}"));
@@ -145,7 +150,7 @@ fn show_content(app: &mut PatcherApp, ui: &mut egui::Ui) {
                                             .spacing([12.0, 3.0])
                                             .show(ui, |ui| {
                                                 for (board, versions) in &compat {
-                                                    ui.label(board);
+                                                    ui.label(board.to_string());
                                                     let ver_str = versions
                                                         .iter()
                                                         .map(|v| v.to_string())

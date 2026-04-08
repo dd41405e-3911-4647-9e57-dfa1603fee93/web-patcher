@@ -27,8 +27,9 @@ pub(crate) fn show_patch_entry(ui: &mut egui::Ui, entry: &mut PatchEntry) {
                 // A patch that is currently applied cannot be unchecked if none
                 // of its targets are revertible (all blind/append — no known
                 // original bytes to restore).
-                let can_revert = entry.definition.targets.iter().any(|t| !t.blind);
-                let mut enabled = !matches!(entry.selection, PatchSelection::Disabled);
+                let can_revert = entry.status == PatchStatus::Stock
+                    || entry.definition.targets.iter().any(|t| !t.blind);
+                let mut enabled = entry.selection != PatchSelection::Disabled;
                 let checkbox = ui.add_enabled(can_revert || !enabled, egui::Checkbox::new(&mut enabled, ""));
                 if checkbox.changed() {
                     entry.selection = if enabled {

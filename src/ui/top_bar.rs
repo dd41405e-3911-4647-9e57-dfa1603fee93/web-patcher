@@ -123,6 +123,12 @@ pub(crate) fn show(app: &mut PatcherApp, ctx: &egui::Context) {
                             if app.show_supported_patches { MobileView::SupportedPatches } else { MobileView::None };
                         app.show_mobile_menu = false;
                     }
+
+                    ui.add_space(4.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    super::helpers::show_version_footer(ui);
                 });
             });
     }

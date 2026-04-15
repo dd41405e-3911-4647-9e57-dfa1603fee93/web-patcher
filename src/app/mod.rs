@@ -267,14 +267,9 @@ impl eframe::App for PatcherApp {
                 supported_window::show(self, ui);
             }
 
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                ui.hyperlink_to(
-                    format!("v{} · Source Code", env!("CARGO_PKG_VERSION")),
-                    "https://github.com/dd41405e-3911-4647-9e57-dfa1603fee93/web-patcher",
-                );
-
-                egui::warn_if_debug_build(ui);
-            });
+            if !is_mobile {
+                crate::ui::helpers::show_version_footer(ui);
+            }
         });
 
         // Must be last — renders toasts on top of everything.

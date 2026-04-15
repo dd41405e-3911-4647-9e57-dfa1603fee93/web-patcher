@@ -10,6 +10,17 @@ pub(crate) fn is_mobile(ctx: &egui::Context) -> bool {
     ctx.viewport_rect().width() < 600.0
 }
 
+/// Shows the version link and debug-build warning, centered.
+pub(crate) fn show_version_footer(ui: &mut Ui) {
+    ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+        ui.hyperlink_to(
+            format!("v{} · Source Code", env!("CARGO_PKG_VERSION")),
+            "https://github.com/dd41405e-3911-4647-9e57-dfa1603fee93/web-patcher",
+        );
+        egui::warn_if_debug_build(ui);
+    });
+}
+
 /// Returns the standard card-styled [`egui::Frame`] used throughout the UI.
 pub(crate) fn card_frame(ui: &Ui) -> egui::Frame {
     let fill = if ui.visuals().dark_mode {
